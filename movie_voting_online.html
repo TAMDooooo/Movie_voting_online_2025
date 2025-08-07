@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电影投票大赛</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        .header {
+            background-color: #e2238c;
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .movie-card {
+            transition: all 0.3s;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        .movie-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .movie-card.voted {
+            border: 3px solid #ec4d75;
+        }
+        .vote-btn {
+            transition: all 0.3s;
+        }
+        .countdown {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #e0ee18;
+        }
+        .results-section {
+            background-color: #e9ecef;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-top: 2rem;
+        }
+        .progress {
+            height: 30px;
+            margin-bottom: 15px;
+        }
+        .progress-bar {
+            font-size: 1rem;
+            line-height: 30px;
+        }
+        .reset-btn {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header text-center">
+        <div class="container">
+            <h1>2025年度最佳电影投票</h1>
+            <p class="lead">为您最喜欢的电影投上一票</p>
+            <div class="countdown-container">
+                <p>投票截止时间: <span id="end-time">2025-08-07 15:00:00</span></p>
+                <p>剩余时间: <span id="countdown" class="countdown"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 投票区 -->
+        <div class="row" id="voting-section">
+            <div class="col-12">
+                <h2 class="text-center mb-4">候选电影</h2>
+                <div class="alert alert-info">
+                    温馨提示: 每位用户只能为一部电影投票，投票后不可更改
+                </div>
+            </div>
+            
+            <!-- 电影卡片将通过JavaScript动态生成 -->
+            <div class="row" id="movies-container"></div>
+        </div>
+
+        <!-- 结果区 -->
+        <div class="results-section" id="results-section" style="display: none;">
+            <h2 class="text-center mb-4">投票结果</h2>
+            <div id="results-container"></div>
+            <div class="text-center mt-4">
+                <button id="back-to-vote" class="btn btn-secondary">返回投票页面</button>
+                <!-- 添加重置按钮 -->
+                <button id="reset-votes" class="btn btn-danger reset-btn">重置所有票数</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white text-center py-4 mt-5">
+        <div class="container">
+            <p>© 2025 电影投票系统 | 所有数据仅用于演示</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 电影数据
+        const movies = [
+            { id: 1, title: "电影A", director: "唐安安", year: 2025, votes: 0 },
+            { id: 2, title: "电影B", director: "苏妙妙", year: 2025, votes: 0 },
+            { id: 3, title: "电影C", director: "黄芸芸", year: 2025, votes: 0 },
+            { id: 4, title: "电影D", director: "廖洋洋", year: 2025, votes: 0 },
+            { id: 5, title: "电影E", director: "张幽幽", year: 2025, votes: 0 },
+            { id: 6, title: "电影F", director: "李青青", year: 2025, votes: 0 }
+        ];
+
+        // 设置截止时间 (YYYY-MM-DD HH:MM:SS)
+        const endTime = new Date("2025-08-07 15:00:00").getTime();
+        document.getElementById('end-time').textContent = formatDate(new Date(endTime));
+
+        // 用户投票状态
+        let hasVoted = localStorage.getItem('hasVoted') === 'true';
+        let votedMovieId = localStorage.getItem('votedMovieId') || null;
+        let isVotingEnded = localStorage.getItem('isVotingEnded') === 'true';
+
+        // 重置所有票数
+        function resetAllVotes() {
+            movies.forEach(movie => {
+                movie.votes = 0;
+            });
+            
+            // 清除本地存储中的投票数据
+            localStorage.removeItem('movieVotes');
+            localStorage.removeItem('hasVoted');
+            localStorage.removeItem('votedMovieId');
+            localStorage.removeItem('isVotingEnded');
+            
+            hasVoted = false;
+            votedMovieId = null;
+            isVotingEnded = false;
+            
+            // 保存重置后的数据
+            const votesData = {};
+            movies.forEach(m => votesData[m.id] = m.votes);
+            localStorage.setItem('movieVotes', JSON.stringify(votesData));
+            
+            // 重新渲染电影列表
+            renderMovies();
+            
+            // 显示投票区
+            document.getElementById('voting-section').style.display = 'block';
+            document.getElementById('results-section').style.display = 'none';
+            
+            alert('所有票数已重置，可以开始新一轮投票！');
+        }
+
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            // 从本地存储加载投票数据
+            const savedVotes = localStorage.getItem('movieVotes');
+            if (savedVotes) {
+                const parsedVotes = JSON.parse(savedVotes);
+                movies.forEach(movie => {
+                    if (parsedVotes[movie.id]) {
+                        movie.votes = parsedVotes[movie.id];
+                    }
+                });
+            }
+
+            // 检查是否已过截止时间
+            const now = new Date().getTime();
+            if (now >= endTime || isVotingEnded) {
+                isVotingEnded = true;
+                localStorage.setItem('isVotingEnded', 'true');
+                showResults();
+            } else {
+                updateCountdown();
+                const countdownInterval = setInterval(updateCountdown, 1000);
+                
+                // 设置截止时间到达时的处理
+                setTimeout(() => {
+                    clearInterval(countdownInterval);
+                    isVotingEnded = true;
+                    localStorage.setItem('isVotingEnded', 'true');
+                    showResults();
+                }, endTime - now);
+            }
+
+            renderMovies();
+            
+            // 如果用户已经投过票，显示已投票状态
+            if (hasVoted && votedMovieId) {
+                const votedMovie = document.querySelector(`.movie-card[data-id="${votedMovieId}"]`);
+                if (votedMovie) {
+                    votedMovie.classList.add('voted');
+                    const voteBtn = votedMovie.querySelector('.vote-btn');
+                    voteBtn.textContent = '已投票';
+                    voteBtn.classList.remove('btn-primary');
+                    voteBtn.classList.add('btn-success');
+                    voteBtn.disabled = true;
+                }
+            }
+            
+            // 添加重置按钮事件
+            document.getElementById('reset-votes').addEventListener('click', resetAllVotes);
+        });
+
+        // 渲染电影列表
+        function renderMovies() {
+            const container = document.getElementById('movies-container');
+            container.innerHTML = '';
+
+            movies.forEach(movie => {
+                const movieCard = document.createElement('div');
+                movieCard.className = 'col-md-6 col-lg-4';
+                movieCard.dataset.id = movie.id;
+                movieCard.innerHTML = `
+                    <div class="card movie-card h-100">
+                        <img src="https://via.placeholder.com/300x200?text=${encodeURIComponent(movie.title)}" class="card-img-top" alt="${movie.title}">
+                        <div class="card-body">
+                            <h5 class="card-title">${movie.title}</h5>
+                            <p class="card-text">
+                                <small class="text-muted">导演: ${movie.director}</small><br>
+                                <small class="text-muted">年份: ${movie.year}</small>
+                            </p>
+                            <p class="card-text">当前票数: <span class="vote-count">${movie.votes}</span></p>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <button class="btn btn-primary w-100 vote-btn" data-id="${movie.id}" ${isVotingEnded ? 'disabled' : ''}>
+                                ${votedMovieId == movie.id ? '已投票' : '投票'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(movieCard);
+            });
+
+            // 添加投票事件监听
+            document.querySelectorAll('.vote-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const movieId = parseInt(this.dataset.id);
+                    voteForMovie(movieId);
+                });
+            });
+        }
+
+        // 投票函数
+        function voteForMovie(movieId) {
+            if (isVotingEnded) {
+                alert('投票已截止，谢谢参与！');
+                return;
+            }
+
+            if (hasVoted) {
+                alert('您已经投过票了，谢谢参与！');
+                return;
+            }
+
+            const movie = movies.find(m => m.id === movieId);
+            if (movie) {
+                movie.votes++;
+                hasVoted = true;
+                votedMovieId = movieId;
+                
+                // 更新本地存储
+                localStorage.setItem('hasVoted', 'true');
+                localStorage.setItem('votedMovieId', movieId);
+                
+                // 保存投票数据
+                const votesData = {};
+                movies.forEach(m => votesData[m.id] = m.votes);
+                localStorage.setItem('movieVotes', JSON.stringify(votesData));
+                
+                // 更新UI
+                const movieCard = document.querySelector(`.movie-card[data-id="${movieId}"]`);
+                movieCard.classList.add('voted');
+                const voteBtn = movieCard.querySelector('.vote-btn');
+                voteBtn.textContent = '已投票';
+                voteBtn.classList.remove('btn-primary');
+                voteBtn.classList.add('btn-success');
+                voteBtn.disabled = true;
+                
+                // 更新票数显示
+                const voteCount = movieCard.querySelector('.vote-count');
+                voteCount.textContent = movie.votes;
+                
+                alert(`感谢您为《${movie.title}》投票！`);
+            }
+        }
+
+        // 显示结果
+        function showResults() {
+            document.getElementById('voting-section').style.display = 'none';
+            document.getElementById('results-section').style.display = 'block';
+            
+            const resultsContainer = document.getElementById('results-container');
+            resultsContainer.innerHTML = '';
+            
+            // 按票数排序
+            const sortedMovies = [...movies].sort((a, b) => b.votes - a.votes);
+            
+            // 计算总票数
+            const totalVotes = sortedMovies.reduce((sum, movie) => sum + movie.votes, 0);
+            
+            sortedMovies.forEach(movie => {
+                const percentage = totalVotes > 0 ? Math.round((movie.votes / totalVotes) * 100) : 0;
+                
+                const resultItem = document.createElement('div');
+                resultItem.className = 'mb-4';
+                resultItem.innerHTML = `
+                    <div class="d-flex justify-content-between mb-2">
+                        <h5>${movie.title} <small class="text-muted">${movie.director} (${movie.year})</small></h5>
+                        <span>${movie.votes}票 (${percentage}%)</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: ${percentage}%" 
+                             aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                `;
+                resultsContainer.appendChild(resultItem);
+            });
+            
+            // 添加返回按钮事件
+            document.getElementById('back-to-vote').addEventListener('click', function() {
+                if (!isVotingEnded) {
+                    document.getElementById('voting-section').style.display = 'block';
+                    document.getElementById('results-section').style.display = 'none';
+                } else {
+                    alert('投票已截止，无法返回投票页面！');
+                }
+            });
+        }
+
+        // 更新倒计时
+        function updateCountdown() {
+            const now = new Date().getTime();
+            const distance = endTime - now;
+            
+            if (distance <= 0) {
+                document.getElementById('countdown').textContent = "投票已截止";
+                isVotingEnded = true;
+                localStorage.setItem('isVotingEnded', 'true');
+                showResults();
+                return;
+            }
+            
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            document.getElementById('countdown').textContent = `${days}天 ${hours}小时 ${minutes}分 ${seconds}秒`;
+        }
+
+        // 格式化日期
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+    </script>
+</body>
+</html>

@@ -27,12 +27,12 @@
 1. 将此仓库fork到您的GitHub账户
 2. 在仓库设置中启用GitHub Pages
 3. 选择`main`分支作为源
-4. 访问 `https://[您的用户名].github.io/[仓库名]/`
+4. 访问 `https://github.com/TAMDooooo/Movie_voting_online_2025.git`
 
 ### 本地运行
 
 ```bash
-git clone https://github.com/[您的用户名]/[仓库名].git
+git clone https://github.com/TAMDooooo/Movie_voting_online_2025.git
 cd [仓库名]
 # 使用任何HTTP服务器运行，例如：
 python3 -m http.server 5009

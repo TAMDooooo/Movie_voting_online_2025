@@ -33,7 +33,7 @@
 
 ```bash
 git clone https://github.com/TAMDooooo/Movie_voting_online_2025.git
-cd [仓库名]
+cd Movie_voting_online_2025
 # 使用任何HTTP服务器运行，例如：
 python3 -m http.server 5009
 # 然后在浏览器访问 http://localhost:5009
